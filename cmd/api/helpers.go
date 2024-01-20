@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 
@@ -10,6 +12,43 @@ import (
 )
 
 type envelope map[string]interface{}
+
+func (app *application) readJSON(w http.ResponseWriter, r *http.Request, dst interface{}) error {
+
+	err := json.NewDecoder(r.Body).Decode(dst)
+
+	if err != nil {
+		var syntaxError *json.SyntaxError
+		var unmarshallTypeError *json.UnmarshalTypeError
+		var invalidUnmarshallError *json.InvalidUnmarshalError
+
+		switch {
+
+		case errors.As(err, &syntaxError):
+			return fmt.Errorf("body contains badly-formed JSON (at character %d)", syntaxError.Offset)
+
+		case errors.Is(err, io.ErrUnexpectedEOF):
+			return errors.New("body contains badly-formed JSON")
+
+		case errors.As(err, &unmarshallTypeError):
+			if unmarshallTypeError.Field != "" {
+				return fmt.Errorf("body contains incorrect JSON type for field %q", unmarshallTypeError.Field)
+			}
+			return fmt.Errorf("body contains incorrect JSON type (at character %d)", unmarshallTypeError.Offset)
+
+		case errors.Is(err, io.EOF):
+			return errors.New("body must not be empty")
+
+		case errors.As(err, &invalidUnmarshallError):
+			panic(err)
+
+		default:
+			return err
+
+		}
+	}
+	return nil
+}
 
 func (app *application) writeJSON(w http.ResponseWriter, status int, data envelope, headers http.Header) error {
 	js, err := json.MarshalIndent(data, "", "\t")
