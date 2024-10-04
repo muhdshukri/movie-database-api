@@ -42,7 +42,7 @@ func (m UserModel) GetForToken(tokenScope, tokenPlaintext string) (*User, error)
       SELECT users.id, users.created_at, users.name, users.email, users.password_hash, users.activated, users.version
       FROM users
       INNER JOIN tokens
-      ON users.id = tokens.users_id
+      ON users.id = tokens.user_id
       WHERE tokens.hash = $1
       AND tokens.scope = $2
       AND tokens.expiry = $3
